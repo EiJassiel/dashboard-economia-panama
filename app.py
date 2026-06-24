@@ -550,7 +550,7 @@ def inicializar_estado() -> None:
             intencion = respuesta["intencion"]
         except Exception as exc:
             contenido = (
-                "No pude iniciar el asistente RAG porque el modelo local no esta disponible. "
+                "No pude iniciar el asistente RAG porque falta configurar Groq o hubo un problema con la API. "
                 f"Detalle: {exc}"
             )
             fuentes = []
@@ -581,7 +581,7 @@ def guardar_interaccion(pregunta: str) -> None:
         evidencia = respuesta["evidencia"]
         intencion = respuesta["intencion"]
     except Exception as exc:
-        contenido = f"No pude consultar el modelo local. Detalle: {exc}"
+        contenido = f"No pude consultar Groq. Detalle: {exc}"
         fuentes = []
         evidencia = []
         intencion = "error"
@@ -700,7 +700,7 @@ def main() -> None:
         st.markdown("**Tecnicas usadas**")
         st.write("- Pipeline de datos")
         st.write("- Regresion lineal")
-        st.write("- RAG local con evidencia")
+        st.write("- RAG con evidencia + Groq")
         st.markdown("---")
         mostrar_fuentes()
 
@@ -896,8 +896,8 @@ def main() -> None:
                 <div class="rag-loader">
                     <div class="rag-loader-ring"></div>
                     <div class="rag-loader-copy">
-                        Consultando el modelo local
-                        <span>Recuperando evidencia y generando respuesta con Ollama...</span>
+                        Consultando Groq
+                        <span>Recuperando evidencia y generando respuesta con la API...</span>
                     </div>
                 </div>
                 """,

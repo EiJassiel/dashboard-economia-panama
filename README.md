@@ -12,7 +12,7 @@ Proyecto en Python y Streamlit para visualizar, comparar y proyectar indicadores
   - Inflacion (IPC)
   - Desempleo
 - Dashboard interactivo en Streamlit.
-- Asistente economico con RAG local: recuperacion sobre datos procesados y generacion con un modelo real via Ollama.
+- Asistente economico con RAG: recuperacion sobre datos procesados y generacion con Groq.
 - Vista de rubrica objetivo 100/100 dentro del dashboard: pipeline, visualizacion, RAG, modelo y documentacion.
 
 ## Estructura
@@ -57,22 +57,29 @@ streamlit run app.py
 
 ## Nota sobre el chatbot
 
-El asistente implementa una version local de RAG usando recuperacion TF-IDF sobre los datasets procesados, datos mensuales de IPC 2025 y resumenes generados por el modelo. La respuesta final la redacta un modelo real servido localmente por Ollama, usando solo la evidencia recuperada. Cada respuesta devuelve fuentes y evidencia recuperada con score. No depende de APIs pagas.
+El asistente implementa una version de RAG usando recuperacion TF-IDF sobre los datasets procesados, datos mensuales de IPC 2025 y resumenes generados por el modelo. La respuesta final la redacta Groq usando solo la evidencia recuperada. Cada respuesta devuelve fuentes y evidencia con score.
 
-## Configurar Ollama
+## Configurar Groq
 
-1. Instala Ollama desde [ollama.com](https://ollama.com/).
-2. Descarga al menos un modelo local:
+1. Crea una API key en [Groq Console](https://console.groq.com/keys).
+2. En local, define la variable de entorno antes de abrir Streamlit:
 
-```bash
-ollama pull llama3.1:8b
+```powershell
+$env:GROQ_API_KEY="tu_api_key"
 ```
 
-3. Si quieres usar otro modelo, define la variable de entorno antes de abrir Streamlit:
+3. Si quieres cambiar el modelo por defecto, define tambien:
 
-```bash
-$env:OLLAMA_MODEL="qwen2.5:7b"
+```powershell
+$env:GROQ_MODEL="llama-3.1-8b-instant"
 streamlit run app.py
 ```
 
-4. Ejecuta la app con Ollama corriendo localmente en `http://127.0.0.1:11434`.
+4. En Streamlit Community Cloud, pega el secret asi:
+
+```toml
+GROQ_API_KEY="tu_api_key"
+GROQ_MODEL="llama-3.1-8b-instant"
+```
+
+5. Despliega la app en Streamlit Community Cloud apuntando a `app.py`.

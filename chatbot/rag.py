@@ -23,8 +23,8 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATOS_PROCESADOS = BASE_DIR / "datos" / "procesados"
 INDICADORES = ("Inflacion (IPC)", "Desempleo")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 MESES = {
     1: "enero",
     2: "febrero",
@@ -140,7 +140,7 @@ def construir_documentos() -> pd.DataFrame:
                 "El dashboard integra INEC para inflacion basada en IPC, INEC para IPC mensual 2025 "
                 "y Banco Mundial para desempleo total de Panama. El modelo predictivo usa regresion lineal "
                 "sobre series anuales. El asistente usa recuperacion TF-IDF sobre documentos generados desde "
-                "los CSV procesados y sintetiza la respuesta con un modelo local de Ollama."
+                "los CSV procesados y sintetiza la respuesta con Groq usando solo la evidencia recuperada."
             ),
             "fuente": "INEC, Banco Mundial",
         }
@@ -165,34 +165,48 @@ def recuperar_contexto(pregunta: str, top_k: int = 5) -> pd.DataFrame:
     return documentos.sort_values(["score", "tipo"], ascending=[False, True]).head(top_k)
 
 
-def _ollama_request(path: str, payload: dict | None = None) -> dict:
-    data = None
-    headers = {}
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
+def _obtener_groq_api_key() -> str:
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if api_key:
+        return api_key
 
-    req = request.Request(f"{OLLAMA_URL}{path}", data=data, headers=headers, method="POST" if data else "GET")
+    try:
+        import streamlit as st
+
+        secret_key = st.secrets.get("GROQ_API_KEY", "")
+        if secret_key:
+            return str(secret_key).strip()
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Falta configurar GROQ_API_KEY. Agrega la clave en tu entorno local o en Streamlit Secrets."
+    )
+
+
+def _groq_request(path: str, payload: dict) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        f"{GROQ_API_URL}{path}",
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {_obtener_groq_api_key()}",
+        },
+        method="POST",
+    )
     try:
         with request.urlopen(req, timeout=90) as response:
             return json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        detalle = exc.read().decode("utf-8", errors="ignore")
+        if exc.code in (401, 403):
+            raise RuntimeError("La clave de Groq no es valida o no tiene acceso al modelo configurado.") from exc
+        raise RuntimeError(f"Groq devolvio un error HTTP {exc.code}. Detalle: {detalle}") from exc
     except error.URLError as exc:
-        raise RuntimeError(
-            "No pude conectarme a Ollama. Asegurate de tener la app corriendo en "
-            f"{OLLAMA_URL}."
-        ) from exc
+        raise RuntimeError("No pude conectarme a Groq. Revisa tu conexion a internet.") from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError("Ollama devolvio una respuesta invalida.") from exc
-
-
-def _modelo_disponible() -> bool:
-    try:
-        respuesta = _ollama_request("/api/tags")
-    except RuntimeError:
-        return False
-
-    modelos = [modelo.get("name", "") for modelo in respuesta.get("models", [])]
-    return OLLAMA_MODEL in modelos
+        raise RuntimeError("Groq devolvio una respuesta invalida.") from exc
 
 
 def _construir_prompt(pregunta: str, contexto: pd.DataFrame) -> str:
@@ -215,38 +229,34 @@ def _construir_prompt(pregunta: str, contexto: pd.DataFrame) -> str:
         "Responde en espanol usando solo el contexto proporcionado.\n"
         "Si la informacion no alcanza, dilo con claridad y no inventes.\n"
         "Prioriza datos, periodos, comparaciones y fuentes.\n"
-        "No menciones que usaste TF-IDF ni detalles internos del sistema salvo que el usuario pregunte por metodologia.\n"
-        "Mantente concreto y profesional.\n\n"
+        "Si el usuario saluda o hace una pregunta muy general, responde breve y orienta la consulta hacia los indicadores disponibles.\n"
+        "No menciones detalles internos del sistema salvo que el usuario pregunte por metodologia.\n"
+        "Cierra con una mini linea de fuentes si aplica.\n\n"
         f"Pregunta del usuario:\n{pregunta}\n\n"
         f"Contexto recuperado:\n{contexto_texto}\n"
     )
 
 
 def _generar_respuesta_llm(pregunta: str, contexto: pd.DataFrame) -> str:
-    if not _modelo_disponible():
-        raise RuntimeError(
-            f"El modelo '{OLLAMA_MODEL}' no esta disponible en Ollama. Ejecuta: ollama pull {OLLAMA_MODEL}"
-        )
-
     payload = {
-        "model": OLLAMA_MODEL,
-        "stream": False,
+        "model": GROQ_MODEL,
+        "temperature": 0.2,
         "messages": [
             {
                 "role": "system",
                 "content": (
                     "Eres un asistente economico de Panama. "
-                    "Respondes solo con base en la evidencia entregada y nunca inventas cifras."
+                    "Respondes solo con base en la evidencia entregada y nunca inventas cifras. "
+                    "Menciona claramente si la pregunta excede el contexto recuperado."
                 ),
             },
             {"role": "user", "content": _construir_prompt(pregunta, contexto)},
         ],
-        "options": {"temperature": 0.2},
     }
-    respuesta = _ollama_request("/api/chat", payload)
-    contenido = respuesta.get("message", {}).get("content", "").strip()
+    respuesta = _groq_request("/chat/completions", payload)
+    contenido = respuesta.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     if not contenido:
-        raise RuntimeError("Ollama no devolvio contenido para esta consulta.")
+        raise RuntimeError("Groq no devolvio contenido para esta consulta.")
     return contenido
 
 
@@ -280,9 +290,9 @@ def responder_pregunta(pregunta: str) -> dict:
         "contexto": contexto[["tipo", "indicador", "periodo", "texto", "fuente", "score"]].to_dict("records"),
         "evidencia": evidencia,
         "fuentes": fuentes,
-        "intencion": "rag_ollama",
+        "intencion": "rag_groq",
         "indicadores": sorted(contexto["indicador"].dropna().unique().tolist()),
-        "modelo": OLLAMA_MODEL,
+        "modelo": GROQ_MODEL,
     }
 
 
