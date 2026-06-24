@@ -12,7 +12,7 @@ Proyecto en Python y Streamlit para visualizar, comparar y proyectar indicadores
   - Inflacion (IPC)
   - Desempleo
 - Dashboard interactivo en Streamlit.
-- Asistente economico con RAG local, deteccion de intencion, respuesta calculada desde CSV y evidencia recuperada.
+- Asistente economico con RAG local: recuperacion sobre datos procesados y generacion con un modelo real via Ollama.
 - Vista de rubrica objetivo 100/100 dentro del dashboard: pipeline, visualizacion, RAG, modelo y documentacion.
 
 ## Estructura
@@ -57,4 +57,22 @@ streamlit run app.py
 
 ## Nota sobre el chatbot
 
-El asistente implementa una version local de RAG usando recuperacion TF-IDF sobre los datasets procesados, datos mensuales de IPC 2025 y resumenes generados por el modelo. Detecta preguntas sobre ultimo dato, tendencia, maximos, minimos, anos especificos, comparacion, prediccion y metodologia. Cada respuesta devuelve fuentes y evidencia recuperada con score. No depende de APIs externas.
+El asistente implementa una version local de RAG usando recuperacion TF-IDF sobre los datasets procesados, datos mensuales de IPC 2025 y resumenes generados por el modelo. La respuesta final la redacta un modelo real servido localmente por Ollama, usando solo la evidencia recuperada. Cada respuesta devuelve fuentes y evidencia recuperada con score. No depende de APIs pagas.
+
+## Configurar Ollama
+
+1. Instala Ollama desde [ollama.com](https://ollama.com/).
+2. Descarga al menos un modelo local:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+3. Si quieres usar otro modelo, define la variable de entorno antes de abrir Streamlit:
+
+```bash
+$env:OLLAMA_MODEL="qwen2.5:7b"
+streamlit run app.py
+```
+
+4. Ejecuta la app con Ollama corriendo localmente en `http://127.0.0.1:11434`.

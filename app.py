@@ -304,37 +304,89 @@ def inyectar_estilos() -> None:
             }
 
             .chat-input-shell {
-                background: #ECE8DF;
+                background: linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(236,232,223,0.96) 100%);
                 border: 1px solid #D8D1C5;
-                border-radius: 14px;
+                border-radius: 18px;
                 box-sizing: border-box;
-                box-shadow: 0 8px 24px rgba(23,33,27,0.05);
+                box-shadow: 0 12px 28px rgba(23,33,27,0.06);
                 margin: 14px 0 0;
                 max-width: 100%;
-                padding: 8px;
+                padding: 12px;
                 width: 100%;
             }
 
             .chat-input-shell [data-testid="stForm"] {
                 border: 0;
                 padding: 0;
+                background: transparent !important;
+            }
+
+            .chat-input-shell [data-testid="stForm"] > div:first-child {
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
+            .chat-input-shell [data-testid="stForm"] > div:last-child {
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
+            .chat-input-shell div[data-baseweb="input"] {
+                background: transparent !important;
             }
 
             .chat-input-shell .stTextInput input {
                 background: #FFFFFF !important;
                 border: 1px solid #D8D1C5 !important;
-                border-radius: 10px !important;
+                border-radius: 14px !important;
+                box-shadow: none !important;
+                color: var(--text) !important;
                 min-height: 46px;
+                padding-right: 14px !important;
+                transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            }
+
+            .chat-input-shell .stTextInput input:focus,
+            .chat-input-shell .stTextInput input:focus-visible,
+            .chat-input-shell div[data-baseweb="input"]:focus-within {
+                border-color: var(--gold) !important;
+                box-shadow: 0 0 0 3px rgba(181,139,59,0.16) !important;
+                outline: none !important;
+            }
+
+            .chat-input-shell .stTextInput input::selection {
+                background: rgba(181,139,59,0.18);
+                color: var(--text);
             }
 
             .chat-input-shell .stFormSubmitButton button {
                 background: #17211B;
                 border-color: #17211B;
+                border-radius: 12px;
+                box-shadow: none !important;
                 color: #FFFFFF;
                 min-height: 46px;
                 max-width: 150px !important;
                 min-width: 150px !important;
+                transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
                 width: 150px !important;
+            }
+
+            .chat-input-shell .stFormSubmitButton button:hover {
+                background: #244A3F;
+                border-color: #244A3F;
+                box-shadow: 0 10px 22px rgba(24,56,47,0.16) !important;
+                transform: translateY(-1px);
+            }
+
+            .chat-input-shell .stFormSubmitButton button:focus,
+            .chat-input-shell .stFormSubmitButton button:focus-visible {
+                box-shadow: 0 0 0 3px rgba(181,139,59,0.18) !important;
+                outline: none !important;
             }
 
             div[data-testid="stFormSubmitButton"] button {
@@ -354,6 +406,50 @@ def inyectar_estilos() -> None:
                 font-weight: 700;
                 margin: 18px 0 8px;
                 max-width: 100%;
+            }
+
+            .rag-loader {
+                align-items: center;
+                background: rgba(255,255,255,0.82);
+                border: 1px solid rgba(181,139,59,0.28);
+                border-radius: 14px;
+                box-shadow: 0 10px 24px rgba(23,33,27,0.06);
+                display: inline-flex;
+                gap: 12px;
+                margin: 14px 0 6px;
+                padding: 12px 16px;
+            }
+
+            .rag-loader-ring {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                border: 2px solid rgba(24,56,47,0.14);
+                border-top-color: var(--gold);
+                animation: rag-spin 0.85s linear infinite;
+                flex-shrink: 0;
+            }
+
+            .rag-loader-copy {
+                color: var(--text);
+                font-size: 0.9rem;
+                line-height: 1.3;
+            }
+
+            .rag-loader-copy span {
+                color: var(--muted);
+                display: block;
+                font-size: 0.78rem;
+                margin-top: 2px;
+            }
+
+            @keyframes rag-spin {
+                from {
+                    transform: rotate(0deg);
+                }
+                to {
+                    transform: rotate(360deg);
+                }
             }
 
             @media (max-width: 760px) {
@@ -446,29 +542,59 @@ def inyectar_estilos() -> None:
 def inicializar_estado() -> None:
     if "chat_history" not in st.session_state:
         pregunta = "Como ha evolucionado la inflacion en Panama en los ultimos 5 anos?"
-        respuesta = responder_pregunta(pregunta)
+        try:
+            respuesta = responder_pregunta(pregunta)
+            contenido = respuesta["respuesta"]
+            fuentes = respuesta["fuentes"]
+            evidencia = respuesta["evidencia"]
+            intencion = respuesta["intencion"]
+        except Exception as exc:
+            contenido = (
+                "No pude iniciar el asistente RAG porque el modelo local no esta disponible. "
+                f"Detalle: {exc}"
+            )
+            fuentes = []
+            evidencia = []
+            intencion = "error"
         st.session_state.chat_history = [
             {"role": "user", "content": pregunta, "sources": []},
             {
                 "role": "assistant",
-                "content": respuesta["respuesta"],
-                "sources": respuesta["fuentes"],
-                "evidence": respuesta["evidencia"],
-                "intent": respuesta["intencion"],
+                "content": contenido,
+                "sources": fuentes,
+                "evidence": evidencia,
+                "intent": intencion,
             },
         ]
+    if "rag_cargando" not in st.session_state:
+        st.session_state.rag_cargando = False
+    if "rag_pregunta_pendiente" not in st.session_state:
+        st.session_state.rag_pregunta_pendiente = ""
 
 
 def guardar_interaccion(pregunta: str) -> None:
-    respuesta = responder_pregunta(pregunta)
+    st.session_state.rag_cargando = True
+    try:
+        respuesta = responder_pregunta(pregunta)
+        contenido = respuesta["respuesta"]
+        fuentes = respuesta["fuentes"]
+        evidencia = respuesta["evidencia"]
+        intencion = respuesta["intencion"]
+    except Exception as exc:
+        contenido = f"No pude consultar el modelo local. Detalle: {exc}"
+        fuentes = []
+        evidencia = []
+        intencion = "error"
+    finally:
+        st.session_state.rag_cargando = False
     st.session_state.chat_history.append({"role": "user", "content": pregunta, "sources": []})
     st.session_state.chat_history.append(
         {
             "role": "assistant",
-            "content": respuesta["respuesta"],
-            "sources": respuesta["fuentes"],
-            "evidence": respuesta["evidencia"],
-            "intent": respuesta["intencion"],
+            "content": contenido,
+            "sources": fuentes,
+            "evidence": evidencia,
+            "intent": intencion,
         }
     )
 
@@ -764,6 +890,20 @@ def main() -> None:
         chat_html.append("</div>")
         st.markdown("".join(chat_html), unsafe_allow_html=True)
 
+        if st.session_state.get("rag_cargando"):
+            st.markdown(
+                """
+                <div class="rag-loader">
+                    <div class="rag-loader-ring"></div>
+                    <div class="rag-loader-copy">
+                        Consultando el modelo local
+                        <span>Recuperando evidencia y generando respuesta con Ollama...</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         st.markdown('<div class="chat-input-shell">', unsafe_allow_html=True)
         with st.form("rag_form", clear_on_submit=True):
             pregunta = st.text_input(
@@ -775,7 +915,12 @@ def main() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
         if enviar and pregunta.strip():
-            guardar_interaccion(pregunta.strip())
+            st.session_state.rag_pregunta_pendiente = pregunta.strip()
+            st.session_state.rag_cargando = True
+            st.rerun()
+        if st.session_state.get("rag_cargando") and st.session_state.get("rag_pregunta_pendiente"):
+            guardar_interaccion(st.session_state.rag_pregunta_pendiente)
+            st.session_state.rag_pregunta_pendiente = ""
             st.rerun()
 
         st.markdown('<div class="suggestion-label">Preguntas rapidas</div>', unsafe_allow_html=True)
